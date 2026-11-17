@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Diffusion Playground — 2D Score-Based Diffusion Visualizer</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0f17'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%2338bdf8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23fb923c'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="diffusion-canvas" aria-label="2D Score-Based Diffusion Canvas"></canvas>
+
+      <!-- Top-left ML-Lab Telemetry HUD -->
+      <header class="hud-telemetry">
+        <div class="hud-title-row">
+          <div class="brand-title">
+            <span class="brand-mark">∇<sub>x</sub> log p<sub>t</sub>(x)</span>
+            <h1>Diffusion Playground</h1>
+          </div>
+          <span id="mode-badge" class="mode-badge mode-ode">PROBABILITY FLOW ODE</span>
+        </div>
+
+        <dl class="metrics-grid">
+          <div class="metric-item">
+            <dt>t</dt>
+            <dd id="metric-t">1.000</dd>
+          </div>
+          <div class="metric-item">
+            <dt>α<sub>t</sub></dt>
+            <dd id="metric-alpha">0.001</dd>
+          </div>
+          <div class="metric-item">
+            <dt>σ<sub>t</sub></dt>
+            <dd id="metric-sigma">1.000</dd>
+          </div>
+          <div class="metric-item">
+            <dt>SNR</dt>
+            <dd id="metric-snr">-60.0 dB</dd>
+          </div>
+          <div class="metric-item">
+            <dt>‖score‖</dt>
+            <dd id="metric-score">0.00</dd>
+          </div>
+          <div class="metric-item">
+            <dt>d<sub>man</sub></dt>
+            <dd id="metric-dist">0.00</dd>
+          </div>
+          <div class="metric-item">
+            <dt>FPS</dt>
+            <dd id="metric-fps">60</dd>
+          </div>
+        </dl>
+      </header>
+
+      <!-- Mobile / Desktop Panel Toggle -->
+      <button
+        id="panel-toggle"
+        class="panel-toggle"
+        type="button"
+        aria-expanded="true"
+        aria-controls="control-panel"
+      >
+        Hide Controls
+      </button>
+
+      <!-- Right-side Lab Control Deck -->
+      <aside id="control-panel" class="control-panel" aria-label="Simulation Controls">
+        <section class="panel-section">
+          <div class="section-header">
+            <h2>Sampler</h2>
+            <span class="section-sub">VP-SDE / Flow</span>
+          </div>
+          <div class="segmented-group" role="group" aria-label="Sampler Mode">
+            <button type="button" class="seg-btn active" data-mode="ode">ODE (Flow)</button>
+            <button type="button" class="seg-btn" data-mode="sde">SDE (DDPM)</button>
+          </div>
+
+          <div class="field-row">
+            <span class="field-label">Schedule</span>
+            <div class="segmented-group compact" role="group" aria-label="Noise Schedule">
+              <button type="button" class="seg-btn active" data-schedule="cosine">Cosine</button>
+              <button type="button" class="seg-btn" data-schedule="linear">Linear</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <h2>Target Manifold p<sub>0</sub></h2>
+            <span class="section-sub">Exact GMM Score</span>
+          </div>
+          <div class="shape-grid" role="group" aria-label="Target Shape">
+            <button type="button" class="shape-btn active" data-shape="spiral">Spiral</button>
+            <button type="button" class="shape-btn" data-shape="moons">Two Moons</button>
+            <button type="button" class="shape-btn" data-shape="heart">Heart</button>
+            <button type="button" class="shape-btn" data-shape="star">Star</button>
+            <button type="button" class="shape-btn" data-shape="rings">Rings</button>
+            <button type="button" class="shape-btn" data-shape="custom">Freehand</button>
+          </div>
+          <div id="custom-draw-bar" class="custom-draw-bar hidden">
+            <p class="draw-hint">Drag on canvas to sketch your target shape, then switch tool to Perturb.</p>
+            <button id="clear-sketch-btn" type="button" class="btn-ghost small">Clear Sketch</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <h2>Mouse Tool</h2>
+            <span id="tool-readout" class="section-sub">r = 0.75</span>
+          </div>
+          <div class="segmented-group" role="group" aria-label="Mouse Tool">
+            <button type="button" class="seg-btn active" data-tool="scatter">Scatter</button>
+            <button type="button" class="seg-btn" data-tool="grab">Grab</button>
+            <button type="button" class="seg-btn" data-tool="draw">Draw</button>
+          </div>
+          <label class="slider-row">
+            <span>Brush Radius</span>
+            <input id="radius-slider" type="range" min="0.25" max="1.80" step="0.05" value="0.75" />
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <h2>Overlays</h2>
+          </div>
+          <div class="toggle-grid">
+            <label class="toggle-pill">
+              <input id="toggle-trails" type="checkbox" checked />
+              <span>Trails</span>
+            </label>
+            <label class="toggle-pill">
+              <input id="toggle-score" type="checkbox" checked />
+              <span>Score Field</span>
+            </label>
+            <label class="toggle-pill">
+              <input id="toggle-targets" type="checkbox" checked />
+              <span>Target Cloud</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-header">
+            <h2>Parameters</h2>
+          </div>
+          <label class="slider-row">
+            <span>Steps <strong id="steps-val">120</strong></span>
+            <input id="steps-slider" type="range" min="20" max="300" step="10" value="120" />
+          </label>
+          <label class="slider-row">
+            <span>Particles <strong id="particles-val">400</strong></span>
+            <input id="particles-slider" type="range" min="50" max="1200" step="50" value="400" />
+          </label>
+          <label class="slider-row">
+            <span>Speed <strong id="speed-val">1×</strong></span>
+            <input id="speed-slider" type="range" min="1" max="4" step="1" value="1" />
+          </label>
+        </section>
+      </aside>
+
+      <!-- Bottom Playback & Live t Scrubber -->
+      <footer class="timeline-bar">
+        <div class="transport-controls">
+          <button id="play-btn" type="button" class="btn-primary" title="Play / Pause (Space)">
+            Pause
+          </button>
+          <button id="step-btn" type="button" class="btn-ghost" title="Single Step">
+            Step
+          </button>
+          <button id="dir-btn" type="button" class="btn-ghost" title="Toggle Reverse / Forward">
+            Rev 1→0
+          </button>
+          <button id="reset-btn" type="button" class="btn-ghost" title="Reset Particles (R)">
+            Reset
+          </button>
+        </div>
+
+        <div class="scrubber-wrap">
+          <span class="scrubber-edge">0.0 <small>Data</small></span>
+          <input
+            id="t-scrubber"
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            value="1"
+            aria-label="Diffusion time t scrubber"
+          />
+          <span class="scrubber-edge"><small>Noise</small> 1.0</span>
+        </div>
+
+        <label class="hold-toggle" title="Freeze t and run live Langevin / Score-flow relaxation">
+          <input id="hold-t-checkbox" type="checkbox" />
+          <span>Hold t</span>
+        </label>
+      </footer>
+
+      <div id="error-banner" class="error-banner hidden" role="alert"></div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
