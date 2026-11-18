@@ -1,70 +1,86 @@
+<p align="center">
+  <img src="assets/readme/hero.svg" alt="diffusion-playground — project visual identity" width="100%" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/Dafenxz0/diffusion-playground/actions/workflows/ci.yml"><img alt="GitHub Actions CI" src="https://github.com/Dafenxz0/diffusion-playground/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://dafenxz0.github.io/diffusion-playground/"><img alt="Live demo" src="https://img.shields.io/badge/Live_Demo-Open_in_browser-1b3441?style=flat&logo=github" /></a>
+</p>
+
 # Diffusion Playground
 
-[![CI & GitHub Pages](https://github.com/Dafenxz0/diffusion-playground/actions/workflows/ci.yml/badge.svg)](https://github.com/Dafenxz0/diffusion-playground/actions/workflows/ci.yml)
+### Turn a cloud of noise into a shape, one step at a time.
 
-An interactive 2D **Score-Based Diffusion Model** visualizer running live in the browser with zero build tooling (vanilla ES modules + HTML5 Canvas2D).
+An interactive 2D laboratory for **score-based diffusion**. Compare deterministic **Probability Flow ODE** sampling with stochastic **reverse SDE** paths, draw your own target distribution and perturb particles while the denoising process is running.
 
-**Live Demo:** https://dafenxz0.github.io/diffusion-playground/
+<p align="center"><a href="https://dafenxz0.github.io/diffusion-playground/"><strong>EXPLORE THE LIVE DEMO</strong></a></p>
 
-## Features
+![ODE versus SDE architecture](assets/readme/architecture.svg)
 
-- **Exact Analytical Score Engine (`src/diffusion.js`)**: Evaluates the exact Gaussian-mixture score $\nabla_x \log p_t(x)$ of the noised empirical target distribution using log-sum-exp stabilization.
-- **Probability Flow ODE vs. Reverse SDE**:
-  - **ODE (Flow)**: 2nd-order Heun predictor-corrector integrating the deterministic Probability Flow ODE.
-  - **SDE (DDPM / Langevin)**: Euler-Maruyama reverse stochastic differential equation with injected Brownian noise.
-- **Live Vector Score-Field Overlay**: Renders the real-time 2D score vector field $\nabla_x \log p_t(x)$ across the plane as noise time $t$ evolves.
-- **Interactive Mouse Perturbation**: Scatter or grab/stretch particles mid-denoising (or under fixed-$t$ Langevin relaxation) and watch the score field pull them back onto the data manifold.
-- **Target Manifolds + Freehand Draw**: Switch between **Spiral**, **Two Moons**, **Heart**, **Star**, **Concentric Rings**, or sketch your own custom 2D distribution directly on the canvas.
-- **Live `t` Scrubber & Telemetry HUD**: Scrub $t \in [0, 1]$ smoothly in real time while monitoring $\alpha_t$, $\sigma_t$, SNR (dB), mean score norm $\|\nabla_x \log p_t(x)\|$, and manifold distance $d_{\text{man}}$.
+## What makes this playground different?
 
-## Mathematical Formulation
+The score field is evaluated **analytically from a Gaussian mixture over the chosen 2D target samples**. This is **not** a pretrained image diffusion model or a neural network estimating the score. You can see the exact score vectors as time evolves.
 
-### Forward VP-SDE & Marginals
+| Experiment | What you see |
+| --- | --- |
+| **ODE / Flow** | Deterministic trajectories integrated with second-order Heun |
+| **SDE** | Reverse stochastic trajectories integrated with Euler–Maruyama noise |
+| **Shapes** | Spiral, Two Moons, Heart, Star, Rings or your own drawing |
+| **Perturbation** | Scatter or grab particles during denoising |
+| **Telemetry** | Noise time, `α`, `σ`, SNR, score norm and manifold distance |
 
-Given a 2D empirical target cloud $\{y_i\}_{i=1}^M$ smoothed with intrinsic bandwidth $\sigma_{\text{data}}$, the Variance-Preserving (VP) SDE
+## Open it
 
-$$\mathrm{d}x = -\frac{1}{2}\beta(t) x\,\mathrm{d}t + \sqrt{\beta(t)}\,\mathrm{d}w, \qquad t \in [0, 1]$$
+**[Launch Diffusion Playground →](https://dafenxz0.github.io/diffusion-playground/)**
 
-induces the closed-form marginal transition $p(x_t \mid y_i) = \mathcal{N}(x_t;\; \alpha_t y_i,\; \sigma_t^2 I)$ with $\alpha_t^2 + \sigma_t^2 = 1$ under both **Cosine** and **Linear** schedules.
-
-### Exact Empirical Score Function
-
-At time $t$, the marginal density is an isotropic Gaussian Mixture Model with variance $v_t = \sigma_t^2 + \alpha_t^2 \sigma_{\text{data}}^2$:
-
-$$p_t(x) = \frac{1}{M}\sum_{i=1}^M \mathcal{N}(x;\; \alpha_t y_i,\; v_t I)$$
-
-Computing posterior responsibility weights $w_i(x, t) \propto \exp\!\left(-\frac{\|x - \alpha_t y_i\|^2}{2v_t}\right)$ via log-sum-exp yields the exact score via Tweedie's formula:
-
-$$\nabla_x \log p_t(x) = \frac{\alpha_t \sum_{i=1}^M w_i(x, t) y_i - x}{v_t}$$
-
-### Reverse Sampling: SDE vs. Probability Flow ODE
-
-- **Reverse SDE (stochastic)**:
-  $$\mathrm{d}x = \left[-\frac{1}{2}\beta(t) x - \beta(t)\nabla_x \log p_t(x)\right]\mathrm{d}t + \sqrt{\beta(t)}\,\mathrm{d}\bar{w}$$
-- **Probability Flow ODE (deterministic, same marginals $p_t$)**:
-  $$\frac{\mathrm{d}x}{\mathrm{d}t} = -\frac{1}{2}\beta(t)\left[x + \nabla_x \log p_t(x)\right]$$
-
-## Controls
+Use the mouse to sketch a custom target or to perturb particles, choose ODE or SDE and scrub the diffusion clock `t ∈ [0,1]`.
 
 | Control | Action |
-| :--- | :--- |
-| **Left-drag on canvas** | Perturb particles (`Scatter` / `Grab`) or sketch custom manifold (`Draw`) |
-| **`Space`** | Play / Pause simulation |
-| **`R`** | Reset particles to Gaussian prior ($t=1$) or data ($t=0$) |
-| **`t` Scrubber** | Scrub forward or backward through diffusion time $t \in [0, 1]$ |
-| **`Hold t`** | Freeze $t$ and run fixed-$t$ Langevin / score-flow relaxation |
+| --- | --- |
+| Left-drag | Draw / Scatter / Grab, depending on active tool |
+| `Space` | Play / pause |
+| `R` | Reset particles |
+| `t` scrubber | Move forward/backward in noise time |
+| `Hold t` | Fixed-time score-flow or Langevin relaxation |
 
-## Local Development & Testing
+## The math, compactly
+
+For a noised target set $\{y_i\}_{i=1}^M$, the VP schedule yields $\alpha_t^2+\sigma_t^2=1$. The marginal is a Gaussian mixture with variance $v_t=\sigma_t^2+\alpha_t^2\sigma_{\mathrm{data}}^2$.
+
+The implemented exact empirical score is
+
+$$
+\nabla_x\log p_t(x)=\frac{\alpha_t\sum_{i=1}^{M} w_i(x,t)y_i-x}{v_t},
+\qquad w_i\propto\exp\left(-\frac{\lVert x-\alpha_t y_i\rVert^2}{2v_t}\right).
+$$
+
+From that field, the two samplers integrate different dynamics:
+
+$$
+\text{ODE: }\frac{dx}{dt}=-\tfrac12\beta(t)[x+\nabla_x\log p_t(x)]
+$$
+
+$$
+\text{SDE: }dx=[-\tfrac12\beta(t)x-\beta(t)\nabla_x\log p_t(x)]dt+\sqrt{\beta(t)}\,d\bar w.
+$$
+
+[`src/diffusion.js`](src/diffusion.js) contains the schedule, analytic score and integrators; [`src/shapes.js`](src/shapes.js) generates target samples; [`src/renderer.js`](src/renderer.js) draws particles and vectors, and [`src/main.js`](src/main.js) wires up interaction.
+
+## Local start
+
+The project uses native browser ES modules and Canvas 2D, so no bundler is needed:
 
 ```bash
-# Run unit tests (Node.js >= 20)
+git clone https://github.com/Dafenxz0/diffusion-playground.git
+cd diffusion-playground
 node --test tests/diffusion.test.js
-
-# Serve locally over HTTP (any static file server)
-npx serve .
-# or: python -m http.server 8000
+python3 -m http.server 8000
 ```
+
+Open `http://localhost:8000`. A Node.js 20+ runtime is recommended for the tests.
+
+**Interpretation note:** the diagram is schematic. ODE and SDE share target marginals in the ideal continuous-time formulation, but individual trajectories differ, especially under finite-step numerical integration.
 
 ## License
 
-[MIT](./LICENSE)
+MIT. See [`LICENSE`](LICENSE).
